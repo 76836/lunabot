@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="./manifest.json">
     <title>lunabot</title>
     <style>
 :root {
@@ -304,6 +305,107 @@ body {
     </div>
 
     <script>
+var CloudAI = true;
+(function () {
+  // Function to prompt for API key and save to local storage
+  function promptForApiKey() {
+    const apiKey = prompt("Please enter your Google Gemini API key. (Free tier API keys may collect and store chat information, Akari treats this AI service as non-confidential.)");
+    if (apiKey) {
+      localStorage.setItem('genAI_API_KEY', apiKey);
+      return apiKey;
+    }
+    return null;
+  }
+
+  // Function to load GoogleGenerativeAI module and initialize it
+  function loadGenerativeAI(apiKey) {
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.textContent = `
+            import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+            import { HarmBlockThreshold, HarmCategory } from "https://esm.run/@google/generative-ai";
+
+            const safetySettings = [
+              {
+                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+              },
+              {
+                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+              },
+              {
+                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+              },
+              {
+                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+              },
+              
+            ];
+            
+            const API_KEY = "${apiKey}";
+            const genAI = new GoogleGenerativeAI(API_KEY);
+            async function run() {
+                const model = genAI.getGenerativeModel({
+                    model: "gemini-1.5-flash-latest",
+                    safetySettings,
+                    systemInstruction: \`
+You are lunabot1 (v4-S), a Discord bot interacting with the user in the Lunabot PWA.
+You don't remember past chats and focus on quickly providing info or having fun.
+Don't say no unless necessary.
+Spamming and borderline PG jokes are fine if asked, but don't go too far.
+For inappropriate jokes, reply with a funny comment, unbiased summary, or just say 'ban.' 
+Keep messages short but complete. No need to introduce yourself unless asked. 
+If threatened with a ban, just comply. Use Discord formatting to your advantage.
+                        \`,
+                });
+
+                const chat = model.startChat({
+                    history: [],
+                    generationConfig: {
+                        maxOutputTokens: 1000,
+                    },
+                });
+
+                globalThis.GenerateResponse = async function(hinp) {
+                    const msg = hinp;
+                    const result = await chat.sendMessage(msg);
+                    const response = await result.response;
+                    const text = response.text();
+                    console.log(text);
+                    say(text);
+                    return text;
+                };
+            }
+
+            run();
+        `;
+    document.body.appendChild(script);
+  }
+
+  // Main execution block
+  (function initialize() {
+    let apiKey = localStorage.getItem('genAI_API_KEY');
+    if (!apiKey) {
+      apiKey = promptForApiKey();
+    }
+
+    if (apiKey) {
+      loadGenerativeAI(apiKey);
+    } else {
+      alert('API key is required to use the Generative AI.');
+    }
+  })();
+})();
+
+
+
+
+
+
+
 const $ = selector => document.querySelector(selector);
 const input = $('.chat-input');
 const fullscreenInput = $('.fullscreen-textarea');
@@ -346,10 +448,7 @@ const sendMessage = () => {
     fullscreenInput.value = '';
     localStorage.removeItem('msgDraft');
     
-    setTimeout(() => addMessage({
-        sender: 'lunabot1',
-        content: `Echo: ${text}`
-    }), 1000);
+    GenerateResponse(text);
 };
 
 const addMessage = msg => {
@@ -398,8 +497,12 @@ input.addEventListener('input', () => {
     localStorage.setItem('msgDraft', input.value);
 });
 
-// Initial message
-addMessage({ sender: 'lunabot1', content: 'Hello! How can I help you today?' });
+        function say(smth) {
+            addMessage({ sender: 'lunabot1', content: smth });
+        };
+        
+// info message
+addMessage({ sender: 'AkariNET System >_', content: 'This project is unfinished, features like chat history will not function correctly, and the app may randomly become unresponsive and require a restart.' });
     </script>
 </body>
 </html>
